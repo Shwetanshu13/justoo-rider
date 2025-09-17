@@ -1,0 +1,6 @@
+.env
+database_dump.json
+listtable.js 
+node_modules
+seed.js
+test_auth.js
