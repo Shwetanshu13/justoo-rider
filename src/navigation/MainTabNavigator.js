@@ -4,6 +4,11 @@ import { Ionicons } from "@expo/vector-icons";
 import CurrentOrdersScreen from "../screens/CurrentOrdersScreen";
 import CompletedOrdersScreen from "../screens/CompletedOrdersScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import DeliveryScreen from "../screens/DeliveryScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
+import RiderDashboardScreen from "../screens/RiderDashboardScreen";
+import AssignedOrdersScreen from "../screens/AssignedOrdersScreen";
+import ShiftManagementScreen from "../screens/ShiftManagementScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Tab = createBottomTabNavigator();
@@ -16,12 +21,14 @@ const MainTabNavigator = () => {
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName;
 
-                    if (route.name === "CurrentOrders") {
+                    if (route.name === "Dashboard") {
+                        iconName = focused ? "home" : "home-outline";
+                    } else if (route.name === "AssignedOrders") {
+                        iconName = focused ? "list-circle" : "list-circle-outline";
+                    } else if (route.name === "CurrentOrders") {
                         iconName = focused ? "list" : "list-outline";
-                    } else if (route.name === "CompletedOrders") {
-                        iconName = focused
-                            ? "checkmark-circle"
-                            : "checkmark-circle-outline";
+                    } else if (route.name === "Shifts") {
+                        iconName = focused ? "time" : "time-outline";
                     } else if (route.name === "Profile") {
                         iconName = focused ? "person" : "person-outline";
                     }
@@ -41,24 +48,38 @@ const MainTabNavigator = () => {
                     height: 60 + Math.max(insets.bottom - 4, 0),
                 },
                 tabBarLabelStyle: {
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: "600",
                 },
                 headerShown: false, // Remove the header as requested
             })}
         >
             <Tab.Screen
-                name="CurrentOrders"
-                component={CurrentOrdersScreen}
+                name="Dashboard"
+                component={RiderDashboardScreen}
                 options={{
-                    tabBarLabel: "Current Orders",
+                    tabBarLabel: "Dashboard",
                 }}
             />
             <Tab.Screen
-                name="CompletedOrders"
-                component={CompletedOrdersScreen}
+                name="AssignedOrders"
+                component={AssignedOrdersScreen}
                 options={{
-                    tabBarLabel: "Completed",
+                    tabBarLabel: "Assigned",
+                }}
+            />
+            <Tab.Screen
+                name="CurrentOrders"
+                component={CurrentOrdersScreen}
+                options={{
+                    tabBarLabel: "Current",
+                }}
+            />
+            <Tab.Screen
+                name="Shifts"
+                component={ShiftManagementScreen}
+                options={{
+                    tabBarLabel: "Shifts",
                 }}
             />
             <Tab.Screen
