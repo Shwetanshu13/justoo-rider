@@ -8,6 +8,8 @@ import {
     ScrollView,
     ActivityIndicator,
     RefreshControl,
+    Modal,
+    TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +21,14 @@ const ProfileScreen = () => {
     const [profile, setProfile] = useState(user);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+    const [editedProfile, setEditedProfile] = useState({});
+    const [passwordData, setPasswordData] = useState({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+    });
     const lastFetchedRef = useRef(0);
     const fetchingRef = useRef(false);
 
@@ -87,6 +97,73 @@ const ProfileScreen = () => {
         ]);
     };
 
+    const openEditModal = () => {
+        setEditedProfile({
+            name: profile?.name || "",
+            email: profile?.email || "",
+            phone: profile?.phone || "",
+            license_number: profile?.license_number || "",
+            vehicle_number: profile?.vehicle_number || "",
+        });
+        setEditModalVisible(true);
+    };
+
+    const saveProfile = async () => {
+        try {
+            const result = await ApiService.updateRiderProfile(editedProfile);
+            if (result.success) {
+                setProfile({ ...profile, ...editedProfile });
+                setEditModalVisible(false);
+                Alert.alert("Success", "Profile updated successfully");
+            } else {
+                Alert.alert("Error", result.error);
+            }
+        } catch (error) {
+            Alert.alert("Error", "Failed to update profile");
+        }
+    };
+
+    const openChangePassword = () => {
+        setPasswordData({
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: "",
+        });
+        setChangePasswordVisible(true);
+    };
+
+    const changePassword = async () => {
+        if (!passwordData.currentPassword || !passwordData.newPassword) {
+            Alert.alert("Error", "Please fill in all password fields");
+            return;
+        }
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            Alert.alert("Error", "New passwords don't match");
+            return;
+        }
+
+        if (passwordData.newPassword.length < 6) {
+            Alert.alert("Error", "New password must be at least 6 characters long");
+            return;
+        }
+
+        try {
+            const result = await ApiService.changePassword(
+                passwordData.currentPassword,
+                passwordData.newPassword
+            );
+            if (result.success) {
+                setChangePasswordVisible(false);
+                Alert.alert("Success", "Password changed successfully");
+            } else {
+                Alert.alert("Error", result.error);
+            }
+        } catch (error) {
+            Alert.alert("Error", "Failed to change password");
+        }
+    };
+
     useEffect(() => {
         // Initialize with user context data once
         if (user && !profile) {
@@ -98,7 +175,7 @@ const ProfileScreen = () => {
     useFocusEffect(
         useCallback(() => {
             loadProfile(true);
-            return () => {};
+            return () => { };
         }, [loadProfile])
     );
 
@@ -246,6 +323,35 @@ const ProfileScreen = () => {
                     </View>
                 </View>
 
+                {/* Profile Actions */}
+                <View style={styles.actionsCard}>
+                    <Text style={styles.statsTitle}>Profile Actions</Text>
+
+                    <TouchableOpacity
+                        style={styles.actionItem}
+                        onPress={openEditModal}
+                    >
+                        <Text style={styles.actionText}>Edit Profile</Text>
+                        <Text style={styles.actionArrow}>→</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionItem}
+                        onPress={openChangePassword}
+                    >
+                        <Text style={styles.actionText}>Change Password</Text>
+                        <Text style={styles.actionArrow}>→</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionItem}
+                        onPress={() => Alert.alert("Info", "Contact support feature coming soon")}
+                    >
+                        <Text style={styles.actionText}>Contact Support</Text>
+                        <Text style={styles.actionArrow}>→</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Logout Button */}
                 <TouchableOpacity
                     style={styles.logoutButton}
@@ -260,6 +366,165 @@ const ProfileScreen = () => {
                     </Text>
                 </View>
             </ScrollView>
+
+            {/* Edit Profile Modal */}
+            <Modal
+                visible={editModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setEditModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Edit Profile</Text>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>Name</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editedProfile.name}
+                                onChangeText={(text) =>
+                                    setEditedProfile({ ...editedProfile, name: text })
+                                }
+                                placeholder="Enter your name"
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>Email</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editedProfile.email}
+                                onChangeText={(text) =>
+                                    setEditedProfile({ ...editedProfile, email: text })
+                                }
+                                placeholder="Enter your email"
+                                keyboardType="email-address"
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>Phone</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editedProfile.phone}
+                                onChangeText={(text) =>
+                                    setEditedProfile({ ...editedProfile, phone: text })
+                                }
+                                placeholder="Enter your phone"
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>License Number</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editedProfile.license_number}
+                                onChangeText={(text) =>
+                                    setEditedProfile({ ...editedProfile, license_number: text })
+                                }
+                                placeholder="Enter license number"
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>Vehicle Number</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editedProfile.vehicle_number}
+                                onChangeText={(text) =>
+                                    setEditedProfile({ ...editedProfile, vehicle_number: text })
+                                }
+                                placeholder="Enter vehicle number"
+                            />
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setEditModalVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.saveButton]}
+                                onPress={saveProfile}
+                            >
+                                <Text style={styles.saveButtonText}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Change Password Modal */}
+            <Modal
+                visible={changePasswordVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setChangePasswordVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Change Password</Text>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>Current Password</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={passwordData.currentPassword}
+                                onChangeText={(text) =>
+                                    setPasswordData({ ...passwordData, currentPassword: text })
+                                }
+                                placeholder="Enter current password"
+                                secureTextEntry
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>New Password</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={passwordData.newPassword}
+                                onChangeText={(text) =>
+                                    setPasswordData({ ...passwordData, newPassword: text })
+                                }
+                                placeholder="Enter new password"
+                                secureTextEntry
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>Confirm New Password</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={passwordData.confirmPassword}
+                                onChangeText={(text) =>
+                                    setPasswordData({ ...passwordData, confirmPassword: text })
+                                }
+                                placeholder="Confirm new password"
+                                secureTextEntry
+                            />
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setChangePasswordVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.saveButton]}
+                                onPress={changePassword}
+                            >
+                                <Text style={styles.saveButtonText}>Change</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -414,6 +679,99 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: "#999",
         textAlign: "center",
+    },
+    actionsCard: {
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        margin: 20,
+        marginTop: 0,
+        padding: 20,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    actionItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    actionText: {
+        fontSize: 16,
+        color: "#333",
+    },
+    actionArrow: {
+        fontSize: 18,
+        color: "#007AFF",
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalContent: {
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        padding: 20,
+        width: "90%",
+        maxHeight: "80%",
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: "#333",
+        marginBottom: 20,
+        textAlign: "center",
+    },
+    inputContainer: {
+        marginBottom: 16,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#333",
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: "#ddd",
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        backgroundColor: "#f9f9f9",
+    },
+    modalActions: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginTop: 20,
+        gap: 12,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    cancelButton: {
+        backgroundColor: "#6C757D",
+    },
+    saveButton: {
+        backgroundColor: "#007AFF",
+    },
+    cancelButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    saveButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
     },
 });
 
