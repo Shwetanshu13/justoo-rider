@@ -1,284 +1,181 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
-    FlatList,
     StyleSheet,
-    RefreshControl,
+    FlatList,
     TouchableOpacity,
-    Alert,
     ActivityIndicator,
-    Modal,
-    Switch,
-} from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import ApiService from "../services/ApiService";
-import { SafeAreaView } from "react-native-safe-area-context";
+    Alert,
+    RefreshControl,
+} from 'react-native';
+import { useNotifications } from '../contexts/NotificationContext';
 
-const NotificationsScreen = () => {
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [preferencesVisible, setPreferencesVisible] = useState(false);
-    const [preferences, setPreferences] = useState({});
+const NotificationsScreen = ({ navigation }) => {
+    const {
+        notifications,
+        notificationCount,
+        loading,
+        refreshing,
+        loadNotifications,
+        markAsRead,
+        markAllAsRead,
+        deleteNotification,
+        refreshNotifications,
+    } = useNotifications();
 
-    const loadNotifications = async (showLoading = true) => {
-        if (showLoading) setLoading(true);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [filter, setFilter] = useState('all'); // all, unread
 
+    useEffect(() => {
+        // Load notifications when filter changes
+        loadNotifications({ page: 1, unreadOnly: filter === 'unread' });
+        setPage(1);
+        setHasMore(true);
+    }, [filter]);
+
+    const handleRefresh = () => {
+        refreshNotifications();
+        setPage(1);
+        setHasMore(true);
+    };
+
+    const handleLoadMore = () => {
+        if (hasMore && !loading) {
+            const nextPage = page + 1;
+            loadNotifications({
+                page: nextPage,
+                unreadOnly: filter === 'unread'
+            }).then(result => {
+                if (result) {
+                    setPage(nextPage);
+                    setHasMore(result.pagination.hasNext);
+                }
+            }).catch(() => {
+                // Error handled in context
+            });
+        }
+    };
+
+    const handleMarkAsRead = async (notificationId) => {
         try {
-            // Load notifications and unread count in parallel
-            const [notificationsResult, unreadResult] = await Promise.all([
-                ApiService.getNotifications(),
-                ApiService.getUnreadNotificationsCount(),
-            ]);
-
-            if (notificationsResult.success) {
-                setNotifications(notificationsResult.data);
-            } else {
-                Alert.alert("Error", notificationsResult.error);
-            }
-
-            if (unreadResult.success) {
-                setUnreadCount(unreadResult.data);
-            }
+            await markAsRead(notificationId);
         } catch (error) {
-            Alert.alert("Error", "Failed to load notifications");
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
+            Alert.alert('Error', 'Failed to mark notification as read');
         }
     };
 
-    const loadPreferences = async () => {
-        try {
-            const result = await ApiService.getNotificationPreferences();
-            if (result.success) {
-                setPreferences(result.data);
-            }
-        } catch (error) {
-            console.error("Load preferences error:", error);
-        }
-    };
-
-    const onRefresh = () => {
-        setRefreshing(true);
-        loadNotifications(false);
-    };
-
-    const markAsRead = async (notificationId) => {
-        try {
-            const result = await ApiService.markNotificationAsRead(notificationId);
-            if (result.success) {
-                // Update the notification locally
-                setNotifications(prev =>
-                    prev.map(notification =>
-                        notification.id === notificationId
-                            ? { ...notification, read: true }
-                            : notification
-                    )
-                );
-                // Update unread count
-                setUnreadCount(prev => Math.max(0, prev - 1));
-            } else {
-                Alert.alert("Error", result.error);
-            }
-        } catch (error) {
-            Alert.alert("Error", "Failed to mark notification as read");
-        }
-    };
-
-    const markAllAsRead = async () => {
-        if (unreadCount === 0) {
-            Alert.alert("Info", "All notifications are already read");
-            return;
-        }
-
-        try {
-            const result = await ApiService.markAllNotificationsAsRead();
-            if (result.success) {
-                // Update all notifications locally
-                setNotifications(prev =>
-                    prev.map(notification => ({ ...notification, read: true }))
-                );
-                setUnreadCount(0);
-                Alert.alert("Success", "All notifications marked as read");
-            } else {
-                Alert.alert("Error", result.error);
-            }
-        } catch (error) {
-            Alert.alert("Error", "Failed to mark all notifications as read");
-        }
-    };
-
-    const deleteNotification = async (notificationId) => {
+    const handleMarkAllAsRead = async () => {
         Alert.alert(
-            "Delete Notification",
-            "Are you sure you want to delete this notification?",
+            'Mark All as Read',
+            'Are you sure you want to mark all notifications as read?',
             [
-                { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => confirmDelete(notificationId) },
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Mark All',
+                    onPress: async () => {
+                        try {
+                            await markAllAsRead();
+                            Alert.alert('Success', 'All notifications marked as read');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to mark all notifications as read');
+                        }
+                    }
+                }
             ]
         );
     };
 
-    const confirmDelete = async (notificationId) => {
-        try {
-            const result = await ApiService.deleteNotification(notificationId);
-            if (result.success) {
-                setNotifications(prev => prev.filter(n => n.id !== notificationId));
-                Alert.alert("Success", "Notification deleted");
-            } else {
-                Alert.alert("Error", result.error);
-            }
-        } catch (error) {
-            Alert.alert("Error", "Failed to delete notification");
+    const handleDeleteNotification = async (notificationId) => {
+        Alert.alert(
+            'Delete Notification',
+            'Are you sure you want to delete this notification?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteNotification(notificationId);
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to delete notification');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const getNotificationIcon = (type) => {
+        switch (type) {
+            case 'order_assigned': return '📦';
+            case 'order_ready': return '✅';
+            case 'order_cancelled': return '❌';
+            case 'payment': return '💰';
+            case 'system': return '🔔';
+            default: return '📱';
         }
     };
 
-    const updatePreferences = async (newPreferences) => {
-        try {
-            const result = await ApiService.updateNotificationPreferences(newPreferences);
-            if (result.success) {
-                setPreferences(newPreferences);
-                Alert.alert("Success", "Notification preferences updated");
-            } else {
-                Alert.alert("Error", result.error);
-            }
-        } catch (error) {
-            Alert.alert("Error", "Failed to update preferences");
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInHours = (now - date) / (1000 * 60 * 60);
+
+        if (diffInHours < 1) {
+            const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+            return diffInMinutes <= 1 ? 'Just now' : `${diffInMinutes}m ago`;
+        } else if (diffInHours < 24) {
+            return `${Math.floor(diffInHours)}h ago`;
+        } else {
+            return date.toLocaleDateString();
         }
     };
-
-    const openPreferences = () => {
-        loadPreferences();
-        setPreferencesVisible(true);
-    };
-
-    useFocusEffect(
-        useCallback(() => {
-            loadNotifications();
-        }, [])
-    );
 
     const renderNotificationItem = ({ item }) => (
         <TouchableOpacity
-            style={[
-                styles.notificationCard,
-                !item.read && styles.unreadNotification
-            ]}
-            onPress={() => !item.read && markAsRead(item.id)}
-            onLongPress={() => deleteNotification(item.id)}
+            style={[styles.notificationItem, !item.isRead && styles.unreadNotification]}
+            onPress={() => handleMarkAsRead(item.id)}
+            onLongPress={() => handleDeleteNotification(item.id)}
         >
             <View style={styles.notificationHeader}>
-                <Text style={styles.notificationTitle}>{item.title}</Text>
-                {!item.read && <View style={styles.unreadDot} />}
+                <View style={styles.iconContainer}>
+                    <Text style={styles.notificationIcon}>
+                        {getNotificationIcon(item.type)}
+                    </Text>
+                </View>
+                <View style={styles.notificationContent}>
+                    <Text style={styles.notificationTitle}>{item.title}</Text>
+                    <Text style={styles.notificationTime}>{formatDate(item.sentAt)}</Text>
+                </View>
+                {!item.isRead && <View style={styles.unreadDot} />}
             </View>
-
             <Text style={styles.notificationMessage}>{item.message}</Text>
-
-            <View style={styles.notificationFooter}>
-                <Text style={styles.notificationTime}>
-                    {new Date(item.created_at).toLocaleString()}
-                </Text>
-                <Text style={styles.notificationType}>
-                    {item.type?.toUpperCase()}
-                </Text>
-            </View>
+            {item.data && (
+                <TouchableOpacity style={styles.actionButton}>
+                    <Text style={styles.actionButtonText}>View Details</Text>
+                </TouchableOpacity>
+            )}
         </TouchableOpacity>
     );
 
-    const renderPreferencesModal = () => (
-        <Modal
-            visible={preferencesVisible}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setPreferencesVisible(false)}
+    const renderFilterButton = (filterValue, label) => (
+        <TouchableOpacity
+            style={[styles.filterButton, filter === filterValue && styles.filterButtonActive]}
+            onPress={() => setFilter(filterValue)}
         >
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Notification Preferences</Text>
-
-                    <View style={styles.preferencesList}>
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceLabel}>New Orders</Text>
-                            <Switch
-                                value={preferences.new_orders || true}
-                                onValueChange={(value) =>
-                                    updatePreferences({ ...preferences, new_orders: value })
-                                }
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceLabel}>Order Updates</Text>
-                            <Switch
-                                value={preferences.order_updates || true}
-                                onValueChange={(value) =>
-                                    updatePreferences({ ...preferences, order_updates: value })
-                                }
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceLabel}>Earnings Updates</Text>
-                            <Switch
-                                value={preferences.earnings_updates || true}
-                                onValueChange={(value) =>
-                                    updatePreferences({ ...preferences, earnings_updates: value })
-                                }
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceLabel}>System Announcements</Text>
-                            <Switch
-                                value={preferences.system_announcements || true}
-                                onValueChange={(value) =>
-                                    updatePreferences({ ...preferences, system_announcements: value })
-                                }
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceLabel}>Push Notifications</Text>
-                            <Switch
-                                value={preferences.push_notifications || true}
-                                onValueChange={(value) =>
-                                    updatePreferences({ ...preferences, push_notifications: value })
-                                }
-                            />
-                        </View>
-
-                        <View style={styles.preferenceItem}>
-                            <Text style={styles.preferenceLabel}>SMS Notifications</Text>
-                            <Switch
-                                value={preferences.sms_notifications || false}
-                                onValueChange={(value) =>
-                                    updatePreferences({ ...preferences, sms_notifications: value })
-                                }
-                            />
-                        </View>
-                    </View>
-
-                    <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={() => setPreferencesVisible(false)}
-                    >
-                        <Text style={styles.closeButtonText}>Close</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </Modal>
+            <Text style={[styles.filterButtonText, filter === filterValue && styles.filterButtonTextActive]}>
+                {label}
+            </Text>
+        </TouchableOpacity>
     );
 
-    const getUnreadCount = () => {
-        return unreadCount;
-    };
-
-    if (loading) {
+    if (loading && page === 1) {
         return (
-            <View style={styles.centerContainer}>
+            <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#007AFF" />
                 <Text style={styles.loadingText}>Loading notifications...</Text>
             </View>
@@ -286,217 +183,239 @@ const NotificationsScreen = () => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <View style={styles.container}>
+            {/* Header with actions */}
             <View style={styles.header}>
-                <Text style={styles.pageTitle}>Notifications</Text>
-                <View style={styles.headerActions}>
-                    {getUnreadCount() > 0 && (
-                        <TouchableOpacity
-                            style={styles.markAllButton}
-                            onPress={markAllAsRead}
-                        >
-                            <Text style={styles.markAllButtonText}>
-                                Mark All Read ({getUnreadCount()})
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                        style={styles.preferencesButton}
-                        onPress={openPreferences}
-                    >
-                        <Text style={styles.preferencesButtonText}>⚙️</Text>
+                <Text style={styles.title}>Notifications</Text>
+                {notificationCount.unread > 0 && (
+                    <TouchableOpacity style={styles.markAllButton} onPress={handleMarkAllAsRead}>
+                        <Text style={styles.markAllText}>Mark All Read</Text>
                     </TouchableOpacity>
-                </View>
+                )}
             </View>
 
-            {notifications.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>
-                        No notifications yet
-                    </Text>
-                    <Text style={styles.emptySubText}>
-                        Pull down to refresh
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={notifications}
-                    renderItem={renderNotificationItem}
-                    keyExtractor={(item) => item.id.toString()}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                        />
-                    }
-                    contentContainerStyle={styles.listContainer}
-                />
-            )}
+            {/* Filter Buttons */}
+            <View style={styles.filterContainer}>
+                {renderFilterButton('all', `All (${notificationCount.total})`)}
+                {renderFilterButton('unread', `Unread (${notificationCount.unread})`)}
+            </View>
 
-            {renderPreferencesModal()}
-        </SafeAreaView>
+            {/* Notifications List */}
+            <FlatList
+                data={notifications}
+                renderItem={renderNotificationItem}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.listContainer}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                }
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.1}
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyIcon}>🔔</Text>
+                        <Text style={styles.emptyText}>
+                            {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+                        </Text>
+                        <Text style={styles.emptySubtext}>
+                            {filter === 'unread'
+                                ? 'You\'ve read all your notifications!'
+                                : 'Notifications about orders and updates will appear here'
+                            }
+                        </Text>
+                    </View>
+                }
+                ListFooterComponent={
+                    loading && page > 1 ? (
+                        <View style={styles.footerLoader}>
+                            <ActivityIndicator size="small" color="#007AFF" />
+                            <Text style={styles.footerLoaderText}>Loading more...</Text>
+                        </View>
+                    ) : null
+                }
+            />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f5f5f5",
+        backgroundColor: '#f5f5f5',
     },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 20,
-        paddingBottom: 10,
-    },
-    headerActions: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
-    preferencesButton: {
-        padding: 8,
-    },
-    preferencesButtonText: {
-        fontSize: 20,
-    },
-    modalOverlay: {
+    loadingContainer: {
         flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    modalContent: {
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: 20,
-        width: "90%",
-        maxHeight: "80%",
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "#333",
-        marginBottom: 20,
-        textAlign: "center",
-    },
-    preferencesList: {
-        marginBottom: 20,
-    },
-    preferenceItem: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f0f0f0",
-    },
-    preferenceLabel: {
-        fontSize: 16,
-        color: "#333",
-    },
-    pageTitle: {
-        fontSize: 24,
-        fontWeight: "bold",
-        color: "#333",
-    },
-    markAllButton: {
-        backgroundColor: "#007AFF",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    markAllButtonText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "600",
-    },
-    centerContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
     },
     loadingText: {
         marginTop: 10,
         fontSize: 16,
-        color: "#666",
+        color: '#666',
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    backButton: {
+        padding: 5,
+    },
+    backButtonText: {
+        color: '#007AFF',
+        fontSize: 16,
+    },
+    title: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#333',
+        textAlign: 'center',
+        flex: 1,
+    },
+    markAllButton: {
+        padding: 5,
+    },
+    markAllText: {
+        color: '#007AFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    filterButton: {
+        flex: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        marginHorizontal: 5,
+        backgroundColor: '#f0f0f0',
+        alignItems: 'center',
+    },
+    filterButtonActive: {
+        backgroundColor: '#007AFF',
+    },
+    filterButtonText: {
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    filterButtonTextActive: {
+        color: '#fff',
     },
     listContainer: {
-        padding: 20,
-        paddingTop: 10,
+        padding: 10,
     },
-    notificationCard: {
-        backgroundColor: "#fff",
+    notificationItem: {
+        backgroundColor: '#fff',
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: "#000",
+        padding: 15,
+        marginBottom: 10,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
     },
     unreadNotification: {
+        backgroundColor: '#f0f8ff',
         borderLeftWidth: 4,
-        borderLeftColor: "#007AFF",
-        backgroundColor: "#F0F8FF",
+        borderLeftColor: '#007AFF',
     },
     notificationHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 8,
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f0f0f0',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    notificationIcon: {
+        fontSize: 20,
+    },
+    notificationContent: {
+        flex: 1,
     },
     notificationTitle: {
         fontSize: 16,
-        fontWeight: "bold",
-        color: "#333",
-        flex: 1,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 2,
+    },
+    notificationTime: {
+        fontSize: 12,
+        color: '#666',
     },
     unreadDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: "#007AFF",
+        backgroundColor: '#007AFF',
     },
     notificationMessage: {
         fontSize: 14,
-        color: "#666",
-        marginBottom: 12,
+        color: '#666',
         lineHeight: 20,
+        marginBottom: 10,
     },
-    notificationFooter: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
+    actionButton: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
     },
-    notificationTime: {
+    actionButtonText: {
+        color: '#fff',
         fontSize: 12,
-        color: "#999",
-    },
-    notificationType: {
-        fontSize: 10,
-        color: "#007AFF",
-        fontWeight: "bold",
-        backgroundColor: "#E3F2FD",
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
+        fontWeight: '600',
     },
     emptyContainer: {
         flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 50,
+    },
+    emptyIcon: {
+        fontSize: 48,
+        marginBottom: 16,
     },
     emptyText: {
         fontSize: 18,
-        color: "#666",
+        color: '#666',
         marginBottom: 8,
+        textAlign: 'center',
     },
-    emptySubText: {
+    emptySubtext: {
         fontSize: 14,
-        color: "#999",
+        color: '#999',
+        textAlign: 'center',
+        paddingHorizontal: 20,
+    },
+    footerLoader: {
+        paddingVertical: 20,
+        alignItems: 'center',
+    },
+    footerLoaderText: {
+        marginTop: 10,
+        fontSize: 14,
+        color: '#666',
     },
 });
 
