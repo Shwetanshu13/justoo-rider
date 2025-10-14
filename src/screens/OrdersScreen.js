@@ -8,18 +8,25 @@ import {
     RefreshControl,
     ActivityIndicator,
     Alert,
+    ScrollView,
+    SectionList,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { orderAPI } from '../services/orderAPI';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const OrdersScreen = () => {
     const navigation = useNavigation();
+    const { refreshNotifications } = useNotifications();
     const [orders, setOrders] = useState([]);
+    const [availableOrders, setAvailableOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [pagination, setPagination] = useState(null);
     const [selectedStatus, setSelectedStatus] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [acceptingOrderId, setAcceptingOrderId] = useState(null);
+    const [selectedTab, setSelectedTab] = useState('available'); // 'available' or 'assigned'
 
     const statusFilters = [
         { label: 'All', value: null },
@@ -60,15 +67,36 @@ const OrdersScreen = () => {
         }
     };
 
+    const loadAvailableOrders = async () => {
+        try {
+            const response = await orderAPI.getAvailableOrders();
+
+            if (response.success) {
+                setAvailableOrders(response.orders || []);
+            }
+        } catch (error) {
+            console.error('Error loading available orders:', error);
+        }
+    };
+
     useFocusEffect(
         useCallback(() => {
-            loadOrders(1, selectedStatus);
-        }, [selectedStatus])
+            if (selectedTab === 'available') {
+                loadAvailableOrders();
+            } else {
+                loadOrders(1, selectedStatus);
+            }
+        }, [selectedStatus, selectedTab])
     );
 
     const handleRefresh = () => {
         setRefreshing(true);
-        loadOrders(1, selectedStatus, false);
+        if (selectedTab === 'available') {
+            loadAvailableOrders();
+        } else {
+            loadOrders(1, selectedStatus, false);
+        }
+        setRefreshing(false);
     };
 
     const handleStatusFilter = (status) => {
@@ -79,6 +107,55 @@ const OrdersScreen = () => {
 
     const handleOrderPress = (order) => {
         navigation.navigate('OrderDetails', { orderId: order.id });
+    };
+
+    const handleAcceptOrder = async (orderId) => {
+        Alert.alert(
+            'Accept Order',
+            'Are you sure you want to accept this order?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Accept',
+                    onPress: async () => {
+                        try {
+                            setAcceptingOrderId(orderId);
+                            const response = await orderAPI.acceptOrder(orderId);
+
+                            if (response.success) {
+                                // Remove the accepted order from the available list
+                                setAvailableOrders(prev => prev.filter(order => order.id !== orderId));
+
+                                // Refresh notifications
+                                await refreshNotifications();
+
+                                Alert.alert(
+                                    'Order Accepted!',
+                                    'The order has been assigned to you.',
+                                    [
+                                        {
+                                            text: 'View Order',
+                                            onPress: () => navigation.navigate('OrderDetails', { orderId }),
+                                        },
+                                        { text: 'OK', style: 'cancel' },
+                                    ]
+                                );
+
+                                // Reload assigned orders
+                                loadOrders(1, selectedStatus, false);
+                            } else {
+                                Alert.alert('Error', response.message || 'Failed to accept order');
+                            }
+                        } catch (error) {
+                            console.error('Error accepting order:', error);
+                            Alert.alert('Error', 'Failed to accept order. Please try again.');
+                        } finally {
+                            setAcceptingOrderId(null);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const loadMoreOrders = () => {
@@ -120,6 +197,87 @@ const OrdersScreen = () => {
         return `₹${(amount || 0).toLocaleString()}`;
     };
 
+    const formatTimeAgo = (dateString) => {
+        if (!dateString) return 'Not set';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+
+        if (diffInMinutes < 1) {
+            return 'Just now';
+        } else if (diffInMinutes < 60) {
+            return `${diffInMinutes}m ago`;
+        } else {
+            const diffInHours = Math.floor(diffInMinutes / 60);
+            if (diffInHours < 24) {
+                return `${diffInHours}h ago`;
+            } else {
+                return date.toLocaleDateString();
+            }
+        }
+    };
+
+    const renderAvailableOrderItem = ({ item }) => (
+        <View style={styles.availableOrderCard}>
+            <View style={styles.orderHeader}>
+                <View style={styles.orderInfo}>
+                    <Text style={styles.orderId}>Order #{item.id}</Text>
+                    <Text style={styles.orderTime}>{formatTimeAgo(item.orderPlacedAt)}</Text>
+                </View>
+                <View style={styles.orderAmount}>
+                    <Text style={styles.amountText}>{formatCurrency(item.totalAmount)}</Text>
+                    <Text style={styles.deliveryFee}>+ {formatCurrency(item.deliveryFee)} delivery</Text>
+                </View>
+            </View>
+
+            <View style={styles.orderDetails}>
+                <View style={styles.detailRow}>
+                    <Text style={styles.detailIcon}>📦</Text>
+                    <Text style={styles.detailText}>{item.itemCount} items</Text>
+                </View>
+
+                {item.deliveryAddress && (
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailIcon}>📍</Text>
+                        <Text style={styles.detailText} numberOfLines={2}>
+                            {item.deliveryAddress.fullAddress}
+                            {item.deliveryAddress.landmark && ` (${item.deliveryAddress.landmark})`}
+                        </Text>
+                    </View>
+                )}
+
+                {item.estimatedDeliveryTime && (
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailIcon}>⏰</Text>
+                        <Text style={styles.detailText}>
+                            Deliver by {new Date(item.estimatedDeliveryTime).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </Text>
+                    </View>
+                )}
+            </View>
+
+            <View style={styles.orderActions}>
+                <TouchableOpacity
+                    style={[styles.acceptButton, acceptingOrderId === item.id && styles.acceptButtonDisabled]}
+                    onPress={() => handleAcceptOrder(item.id)}
+                    disabled={acceptingOrderId === item.id}
+                >
+                    {acceptingOrderId === item.id ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                        <>
+                            <Text style={styles.acceptButtonIcon}>✅</Text>
+                            <Text style={styles.acceptButtonText}>Accept Order</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     const renderOrderItem = ({ item }) => (
         <TouchableOpacity
             style={styles.orderCard}
@@ -139,10 +297,37 @@ const OrdersScreen = () => {
 
             {item.deliveryAddress && (
                 <Text style={styles.deliveryAddress} numberOfLines={2}>
-                    📍 {item.deliveryAddress.street}, {item.deliveryAddress.city}
+                    📍 {item.deliveryAddress.street || item.deliveryAddress.fullAddress}, {item.deliveryAddress.city}
                 </Text>
             )}
         </TouchableOpacity>
+    );
+
+    const renderTabButtons = () => (
+        <View style={styles.tabContainer}>
+            <TouchableOpacity
+                style={[styles.tabButton, selectedTab === 'available' && styles.tabButtonActive]}
+                onPress={() => setSelectedTab('available')}
+            >
+                <Text style={[styles.tabButtonText, selectedTab === 'available' && styles.tabButtonTextActive]}>
+                    Available Orders
+                </Text>
+                {availableOrders.length > 0 && (
+                    <View style={styles.tabBadge}>
+                        <Text style={styles.tabBadgeText}>{availableOrders.length}</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.tabButton, selectedTab === 'assigned' && styles.tabButtonActive]}
+                onPress={() => setSelectedTab('assigned')}
+            >
+                <Text style={[styles.tabButtonText, selectedTab === 'assigned' && styles.tabButtonTextActive]}>
+                    My Orders
+                </Text>
+            </TouchableOpacity>
+        </View>
     );
 
     const renderStatusFilter = () => (
@@ -170,7 +355,7 @@ const OrdersScreen = () => {
         </View>
     );
 
-    if (loading && orders.length === 0) {
+    if (loading && orders.length === 0 && availableOrders.length === 0) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#007AFF" />
@@ -182,39 +367,69 @@ const OrdersScreen = () => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>My Orders</Text>
+                <Text style={styles.title}>Orders</Text>
             </View>
 
-            {renderStatusFilter()}
+            {renderTabButtons()}
 
-            <FlatList
-                data={orders}
-                renderItem={renderOrderItem}
-                keyExtractor={(item) => item.id.toString()}
-                contentContainerStyle={styles.ordersList}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                }
-                onEndReached={loadMoreOrders}
-                onEndReachedThreshold={0.1}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>📦</Text>
-                        <Text style={styles.emptyTitle}>No orders found</Text>
-                        <Text style={styles.emptySubtitle}>
-                            {selectedStatus ? 'No orders with selected status' : 'You don\'t have any assigned orders yet'}
-                        </Text>
-                    </View>
-                }
-                ListFooterComponent={
-                    pagination?.hasNext ? (
-                        <View style={styles.loadingMore}>
-                            <ActivityIndicator size="small" color="#007AFF" />
-                            <Text style={styles.loadingMoreText}>Loading more orders...</Text>
+            {selectedTab === 'available' ? (
+                <FlatList
+                    data={availableOrders}
+                    renderItem={renderAvailableOrderItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={styles.ordersList}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                    }
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>📦</Text>
+                            <Text style={styles.emptyTitle}>No available orders</Text>
+                            <Text style={styles.emptySubtitle}>
+                                New orders will appear here when customers place them
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.refreshButton}
+                                onPress={handleRefresh}
+                            >
+                                <Text style={styles.refreshButtonText}>Refresh</Text>
+                            </TouchableOpacity>
                         </View>
-                    ) : null
-                }
-            />
+                    }
+                />
+            ) : (
+                <>
+                    {renderStatusFilter()}
+                    <FlatList
+                        data={orders}
+                        renderItem={renderOrderItem}
+                        keyExtractor={(item) => item.id.toString()}
+                        contentContainerStyle={styles.ordersList}
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                        }
+                        onEndReached={loadMoreOrders}
+                        onEndReachedThreshold={0.1}
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Text style={styles.emptyText}>📦</Text>
+                                <Text style={styles.emptyTitle}>No orders found</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    {selectedStatus ? 'No orders with selected status' : 'You don\'t have any assigned orders yet'}
+                                </Text>
+                            </View>
+                        }
+                        ListFooterComponent={
+                            pagination?.hasNext ? (
+                                <View style={styles.loadingMore}>
+                                    <ActivityIndicator size="small" color="#007AFF" />
+                                    <Text style={styles.loadingMoreText}>Loading more orders...</Text>
+                                </View>
+                            ) : null
+                        }
+                    />
+                </>
+            )}
         </View>
     );
 };
@@ -361,6 +576,131 @@ const styles = StyleSheet.create({
         marginTop: 10,
         fontSize: 14,
         color: '#666',
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    tabButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+        marginHorizontal: 5,
+        backgroundColor: '#f8f9fa',
+    },
+    tabButtonActive: {
+        backgroundColor: '#007AFF',
+    },
+    tabButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#666',
+    },
+    tabButtonTextActive: {
+        color: '#fff',
+    },
+    tabBadge: {
+        backgroundColor: '#dc3545',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    tabBadgeText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    availableOrderCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 15,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        borderLeftWidth: 4,
+        borderLeftColor: '#28a745',
+    },
+    orderInfo: {
+        flex: 1,
+    },
+    orderTime: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 2,
+    },
+    amountText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#007AFF',
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 8,
+    },
+    detailIcon: {
+        fontSize: 16,
+        marginRight: 8,
+        marginTop: 2,
+    },
+    detailText: {
+        fontSize: 14,
+        color: '#333',
+        flex: 1,
+        lineHeight: 20,
+    },
+    orderActions: {
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        paddingTop: 15,
+        marginTop: 10,
+    },
+    acceptButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#28a745',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+    },
+    acceptButtonDisabled: {
+        backgroundColor: '#6c757d',
+    },
+    acceptButtonIcon: {
+        fontSize: 16,
+        marginRight: 8,
+    },
+    acceptButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    refreshButton: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 20,
+        marginTop: 15,
+    },
+    refreshButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

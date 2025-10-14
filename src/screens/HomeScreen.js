@@ -9,7 +9,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { orderAPI } from '../services/orderAPI';
+import orderAPI from '../services/orderAPI';
 import deliveryAPI from '../services/deliveryAPI';
 import { useNavigation } from '@react-navigation/native';
 
@@ -260,7 +260,7 @@ const HomeScreen = () => {
                         style={styles.actionCard}
                         onPress={() => navigation.navigate('Notifications')}
                     >
-                        <Text style={styles.actionIcon}>�</Text>
+                        <Text style={styles.actionIcon}>🔔</Text>
                         <Text style={styles.actionText}>Notifications</Text>
                     </TouchableOpacity>
 

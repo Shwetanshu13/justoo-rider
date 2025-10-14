@@ -2,6 +2,16 @@ import api from './authAPI';
 
 // Order API functions
 export const orderAPI = {
+    // Get available orders for riders to accept
+    getAvailableOrders: async () => {
+        try {
+            const response = await api.get(`/order/available`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || error;
+        }
+    },
+
     // Get current order for rider
     getCurrentOrder: async () => {
         try {

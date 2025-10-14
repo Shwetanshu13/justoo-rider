@@ -8,12 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
-import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import OrdersScreen from '../screens/OrdersScreen';
 import OrderDetailsScreen from '../screens/OrderDetailsScreen';
 import DeliveryHistoryScreen from '../screens/DeliveryHistoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import AvailableOrdersScreen from '../screens/AvailableOrdersScreen';
 
 // Import components
 import NotificationBadge from '../components/NotificationBadge';
@@ -89,12 +89,12 @@ const MainTabNavigator = () => (
             }}
         />
         <TabNav.Screen
-            name="Profile"
-            component={ProfileScreen}
+            name="Settings"
+            component={SettingsScreen}
             options={{
-                tabBarLabel: 'Profile',
+                tabBarLabel: 'Settings',
                 tabBarIcon: ({ color, size }) => (
-                    <Text style={{ color, fontSize: size }}>👤</Text>
+                    <Text style={{ color, fontSize: size }}>⚙️</Text>
                 ),
             }}
         />
