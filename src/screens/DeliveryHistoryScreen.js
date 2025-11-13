@@ -9,43 +9,32 @@ import {
     Alert,
     RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../contexts/AuthContext';
 import deliveryAPI from '../services/deliveryAPI';
 
-const DeliveryHistoryScreen = ({ navigation }) => {
+const DeliveryHistoryScreen = () => {
+    const navigation = useNavigation();
     const { user } = useContext(AuthContext);
     const [deliveries, setDeliveries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
     const [filter, setFilter] = useState('all'); // all, completed, failed
 
     useEffect(() => {
         loadDeliveries();
     }, [filter]);
 
-    const loadDeliveries = async (pageNum = 1, isRefresh = false) => {
+    const loadDeliveries = async () => {
         try {
-            if (pageNum === 1) {
-                setLoading(true);
-            }
+            setLoading(true);
 
             const response = await deliveryAPI.getDeliveryHistory({
-                page: pageNum,
-                limit: 20,
                 status: filter === 'all' ? undefined : filter,
             });
 
             if (response.success) {
-                if (isRefresh || pageNum === 1) {
-                    setDeliveries(response.data.deliveries);
-                } else {
-                    setDeliveries(prev => [...prev, ...response.data.deliveries]);
-                }
-
-                setHasMore(response.data.deliveries.length === 20);
-                setPage(pageNum);
+                setDeliveries(response.data?.deliveries || []);
             } else {
                 Alert.alert('Error', response.message);
             }
@@ -60,13 +49,7 @@ const DeliveryHistoryScreen = ({ navigation }) => {
 
     const handleRefresh = () => {
         setRefreshing(true);
-        loadDeliveries(1, true);
-    };
-
-    const handleLoadMore = () => {
-        if (hasMore && !loading) {
-            loadDeliveries(page + 1);
-        }
+        loadDeliveries();
     };
 
     const getStatusColor = (status) => {
@@ -148,7 +131,7 @@ const DeliveryHistoryScreen = ({ navigation }) => {
         </TouchableOpacity>
     );
 
-    if (loading && page === 1) {
+    if (loading && deliveries.length === 0) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#007AFF" />
@@ -175,8 +158,6 @@ const DeliveryHistoryScreen = ({ navigation }) => {
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                 }
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.1}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No deliveries found</Text>
@@ -186,14 +167,6 @@ const DeliveryHistoryScreen = ({ navigation }) => {
                                     'No failed deliveries found'}
                         </Text>
                     </View>
-                }
-                ListFooterComponent={
-                    loading && page > 1 ? (
-                        <View style={styles.footerLoader}>
-                            <ActivityIndicator size="small" color="#007AFF" />
-                            <Text style={styles.footerLoaderText}>Loading more...</Text>
-                        </View>
-                    ) : null
                 }
             />
         </View>
@@ -316,15 +289,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#999',
         textAlign: 'center',
-    },
-    footerLoader: {
-        paddingVertical: 20,
-        alignItems: 'center',
-    },
-    footerLoaderText: {
-        marginTop: 10,
-        fontSize: 14,
-        color: '#666',
     },
 });
 

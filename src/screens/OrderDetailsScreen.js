@@ -31,7 +31,11 @@ const OrderDetailsScreen = () => {
             setLoading(true);
             const response = await orderAPI.getOrderDetails(orderId);
 
+            console.log('Order Details Response:', JSON.stringify(response, null, 2));
+
             if (response.success) {
+                console.log('Order loaded:', response.order);
+                console.log('Order items:', response.order.items);
                 setOrder(response.order);
             } else {
                 Alert.alert('Error', response.message);
@@ -240,12 +244,24 @@ const OrderDetailsScreen = () => {
     const renderOrderItem = ({ item }) => (
         <View style={styles.orderItem}>
             <View style={styles.itemHeader}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemPrice}>{formatCurrency(item.price)}</Text>
+                <View style={styles.itemNameContainer}>
+                    <Text style={styles.itemQuantityBadge}>{item.quantity}x</Text>
+                    <Text style={styles.itemName}>{item.itemName || item.name}</Text>
+                </View>
+                <View style={styles.itemPriceContainer}>
+                    <Text style={styles.itemPrice}>
+                        {formatCurrency(parseFloat(item.totalPrice || (item.unitPrice || item.price) * item.quantity))}
+                    </Text>
+                    <Text style={styles.itemUnitPrice}>
+                        ({formatCurrency(parseFloat(item.unitPrice || item.price))} each)
+                    </Text>
+                </View>
             </View>
-            <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
             {item.specialInstructions && (
-                <Text style={styles.itemInstructions}>Note: {item.specialInstructions}</Text>
+                <View style={styles.instructionsContainer}>
+                    <Text style={styles.instructionsIcon}>📝</Text>
+                    <Text style={styles.itemInstructions}>{item.specialInstructions}</Text>
+                </View>
             )}
         </View>
     );
@@ -284,12 +300,43 @@ const OrderDetailsScreen = () => {
                 </View>
             </View>
 
+            {/* Customer Information */}
+            {order.customerName && (
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Customer Information</Text>
+                    <View style={styles.customerInfoContainer}>
+                        <Text style={styles.customerIcon}>👤</Text>
+                        <View style={styles.customerDetailsBox}>
+                            <Text style={styles.customerNameText}>{order.customerName}</Text>
+                            {order.customerPhone && (
+                                <View style={styles.phoneRow}>
+                                    <Text style={styles.phoneIcon}>📞</Text>
+                                    <Text style={styles.customerPhoneText}>{order.customerPhone}</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            )}
+
             {/* Order Summary */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Order Summary</Text>
                 <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Total Amount:</Text>
-                    <Text style={styles.summaryValue}>{formatCurrency(order.totalAmount)}</Text>
+                    <Text style={styles.summaryLabel}>Subtotal:</Text>
+                    <Text style={styles.summaryValue}>{formatCurrency(order.subtotal || 0)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Delivery Fee:</Text>
+                    <Text style={styles.summaryValue}>{formatCurrency(order.deliveryFee || 0)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Tax:</Text>
+                    <Text style={styles.summaryValue}>{formatCurrency(order.taxAmount || 0)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.totalRow]}>
+                    <Text style={styles.totalLabel}>Total Amount:</Text>
+                    <Text style={styles.totalValue}>{formatCurrency(order.totalAmount)}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Order Placed:</Text>
@@ -309,35 +356,29 @@ const OrderDetailsScreen = () => {
                 )}
             </View>
 
-            {/* Customer & Delivery Info */}
+            {/* Delivery Address */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Delivery Information</Text>
+                <Text style={styles.sectionTitle}>Delivery Address</Text>
                 {order.deliveryAddress ? (
                     <View style={styles.addressContainer}>
                         <Text style={styles.addressIcon}>📍</Text>
                         <View style={styles.addressDetails}>
                             <Text style={styles.addressText}>
-                                {order.deliveryAddress.street}
-                            </Text>
-                            <Text style={styles.addressText}>
-                                {order.deliveryAddress.city}, {order.deliveryAddress.state} {order.deliveryAddress.pincode}
+                                {order.deliveryAddress.fullAddress ||
+                                    `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.pincode}`}
                             </Text>
                             {order.deliveryAddress.landmark && (
-                                <Text style={styles.addressText}>
-                                    Landmark: {order.deliveryAddress.landmark}
-                                </Text>
+                                <View style={styles.landmarkRow}>
+                                    <Text style={styles.landmarkIcon}>📌</Text>
+                                    <Text style={styles.landmarkText}>
+                                        {order.deliveryAddress.landmark}
+                                    </Text>
+                                </View>
                             )}
                         </View>
                     </View>
                 ) : (
                     <Text style={styles.noAddress}>No delivery address available</Text>
-                )}
-
-                {order.customerPhone && (
-                    <View style={styles.contactRow}>
-                        <Text style={styles.contactIcon}>📞</Text>
-                        <Text style={styles.contactText}>{order.customerPhone}</Text>
-                    </View>
                 )}
             </View>
 
@@ -536,6 +577,56 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#333',
     },
+    totalRow: {
+        backgroundColor: '#f8f9fa',
+        paddingHorizontal: 10,
+        marginTop: 5,
+        borderRadius: 8,
+        borderBottomWidth: 0,
+    },
+    totalLabel: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    totalValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#007AFF',
+    },
+    customerInfoContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#f8f9fa',
+        padding: 15,
+        borderRadius: 8,
+    },
+    customerIcon: {
+        fontSize: 24,
+        marginRight: 12,
+    },
+    customerDetailsBox: {
+        flex: 1,
+    },
+    customerNameText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 6,
+    },
+    phoneRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    phoneIcon: {
+        fontSize: 16,
+        marginRight: 6,
+    },
+    customerPhoneText: {
+        fontSize: 16,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
     addressContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -558,30 +649,51 @@ const styles = StyleSheet.create({
         color: '#666',
         fontStyle: 'italic',
     },
-    contactRow: {
+    landmarkRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 8,
+        backgroundColor: '#fff3cd',
+        padding: 8,
+        borderRadius: 6,
     },
-    contactIcon: {
+    landmarkIcon: {
         fontSize: 16,
-        marginRight: 10,
+        marginRight: 6,
     },
-    contactText: {
-        fontSize: 16,
-        color: '#333',
+    landmarkText: {
+        fontSize: 14,
+        color: '#856404',
+        fontWeight: '500',
     },
     orderItem: {
         backgroundColor: '#f8f9fa',
         padding: 15,
         borderRadius: 8,
         marginBottom: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: '#007AFF',
     },
     itemHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    itemNameContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 5,
+        flex: 1,
+        marginRight: 10,
+    },
+    itemQuantityBadge: {
+        backgroundColor: '#007AFF',
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: 'bold',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        marginRight: 10,
     },
     itemName: {
         fontSize: 16,
@@ -589,20 +701,36 @@ const styles = StyleSheet.create({
         color: '#333',
         flex: 1,
     },
+    itemPriceContainer: {
+        alignItems: 'flex-end',
+    },
     itemPrice: {
         fontSize: 16,
         fontWeight: 'bold',
         color: '#007AFF',
     },
-    itemQuantity: {
-        fontSize: 14,
+    itemUnitPrice: {
+        fontSize: 12,
         color: '#666',
+        marginTop: 2,
+    },
+    instructionsContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginTop: 10,
+        backgroundColor: '#fff',
+        padding: 8,
+        borderRadius: 6,
+    },
+    instructionsIcon: {
+        fontSize: 14,
+        marginRight: 6,
     },
     itemInstructions: {
         fontSize: 14,
         color: '#666',
         fontStyle: 'italic',
-        marginTop: 5,
+        flex: 1,
     },
     statusButton: {
         paddingVertical: 12,
