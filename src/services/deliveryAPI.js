@@ -50,17 +50,15 @@ export const deliveryAPI = {
     // Get delivery history for rider
     getDeliveryHistory: async (params = {}) => {
         try {
-            const { page = 1, limit = 10, status } = params;
-            const queryParams = new URLSearchParams({
-                page: page.toString(),
-                limit: limit.toString(),
-            });
+            const { status } = params;
+            const queryParams = new URLSearchParams();
 
             if (status) {
                 queryParams.append('status', status);
             }
 
-            const response = await api.get(`/delivery/history?${queryParams}`);
+            const queryString = queryParams.toString();
+            const response = await api.get(`/delivery/history${queryString ? `?${queryString}` : ''}`);
             return response.data;
         } catch (error) {
             throw error.response?.data || error;

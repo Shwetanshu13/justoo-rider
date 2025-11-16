@@ -22,9 +22,7 @@ const OrdersScreen = () => {
     const [availableOrders, setAvailableOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [pagination, setPagination] = useState(null);
     const [selectedStatus, setSelectedStatus] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
     const [acceptingOrderId, setAcceptingOrderId] = useState(null);
     const [selectedTab, setSelectedTab] = useState('available'); // 'available' or 'assigned'
 
@@ -38,11 +36,11 @@ const OrdersScreen = () => {
         { label: 'Cancelled', value: 'cancelled' },
     ];
 
-    const loadOrders = async (page = 1, status = selectedStatus, showLoading = true) => {
+    const loadOrders = async (status = selectedStatus, showLoading = true) => {
         try {
             if (showLoading) setLoading(true);
 
-            const params = { page, limit: 10 };
+            const params = {};
             if (status) {
                 params.status = status;
             }
@@ -50,13 +48,7 @@ const OrdersScreen = () => {
             const response = await orderAPI.getAssignedOrders(params);
 
             if (response.success) {
-                if (page === 1) {
-                    setOrders(response.orders);
-                } else {
-                    setOrders(prev => [...prev, ...response.orders]);
-                }
-                setPagination(response.pagination);
-                setCurrentPage(page);
+                setOrders(response.orders || []);
             }
         } catch (error) {
             console.error('Error loading orders:', error);
@@ -67,15 +59,27 @@ const OrdersScreen = () => {
         }
     };
 
-    const loadAvailableOrders = async () => {
+    const loadAvailableOrders = async (showLoading = true) => {
         try {
+            if (showLoading) setLoading(true);
+
             const response = await orderAPI.getAvailableOrders();
 
+            console.log('Available Orders Response:', JSON.stringify(response, null, 2));
+
             if (response.success) {
-                setAvailableOrders(response.orders || []);
+                const orders = response.orders || [];
+                console.log('Available orders count:', orders.length);
+                if (orders.length > 0) {
+                    console.log('First available order:', JSON.stringify(orders[0], null, 2));
+                }
+                setAvailableOrders(orders);
             }
         } catch (error) {
             console.error('Error loading available orders:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -84,7 +88,7 @@ const OrdersScreen = () => {
             if (selectedTab === 'available') {
                 loadAvailableOrders();
             } else {
-                loadOrders(1, selectedStatus);
+                loadOrders(selectedStatus);
             }
         }, [selectedStatus, selectedTab])
     );
@@ -94,15 +98,14 @@ const OrdersScreen = () => {
         if (selectedTab === 'available') {
             loadAvailableOrders();
         } else {
-            loadOrders(1, selectedStatus, false);
+            loadOrders(selectedStatus, false);
         }
         setRefreshing(false);
     };
 
     const handleStatusFilter = (status) => {
         setSelectedStatus(status);
-        setCurrentPage(1);
-        // loadOrders will be called by useEffect when selectedStatus changes
+        // loadOrders will be called by useFocusEffect when selectedStatus changes
     };
 
     const handleOrderPress = (order) => {
@@ -142,7 +145,7 @@ const OrdersScreen = () => {
                                 );
 
                                 // Reload assigned orders
-                                loadOrders(1, selectedStatus, false);
+                                loadOrders(selectedStatus, false);
                             } else {
                                 Alert.alert('Error', response.message || 'Failed to accept order');
                             }
@@ -156,12 +159,6 @@ const OrdersScreen = () => {
                 }
             ]
         );
-    };
-
-    const loadMoreOrders = () => {
-        if (pagination?.hasNext && !loading) {
-            loadOrders(currentPage + 1, selectedStatus, false);
-        }
     };
 
     const getStatusColor = (status) => {
@@ -217,35 +214,69 @@ const OrdersScreen = () => {
         }
     };
 
-    const renderAvailableOrderItem = ({ item }) => (
-        <View style={styles.availableOrderCard}>
-            <View style={styles.orderHeader}>
-                <View style={styles.orderInfo}>
-                    <Text style={styles.orderId}>Order #{item.id}</Text>
-                    <Text style={styles.orderTime}>{formatTimeAgo(item.orderPlacedAt)}</Text>
-                </View>
-                <View style={styles.orderAmount}>
-                    <Text style={styles.amountText}>{formatCurrency(item.totalAmount)}</Text>
-                    <Text style={styles.deliveryFee}>+ {formatCurrency(item.deliveryFee)} delivery</Text>
-                </View>
-            </View>
+    const renderAvailableOrderItem = ({ item }) => {
+        console.log('Rendering available order:', item.id, 'Total:', item.totalAmount, 'Delivery Fee:', item.deliveryFee);
 
-            <View style={styles.orderDetails}>
-                <View style={styles.detailRow}>
-                    <Text style={styles.detailIcon}>📦</Text>
-                    <Text style={styles.detailText}>{item.itemCount} items</Text>
+        return (
+            <View style={styles.availableOrderCard}>
+                <View style={styles.orderHeader}>
+                    <View style={styles.orderInfo}>
+                        <Text style={styles.orderId}>Order #{item.id}</Text>
+                        <Text style={styles.orderTime}>{formatTimeAgo(item.orderPlacedAt)}</Text>
+                    </View>
+                    <View style={styles.orderAmount}>
+                        <Text style={styles.amountText}>{formatCurrency(item.totalAmount)}</Text>
+                        <Text style={styles.deliveryFee}>+ {formatCurrency(item.deliveryFee)} delivery</Text>
+                    </View>
                 </View>
 
-                {item.deliveryAddress && (
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailIcon}>📍</Text>
-                        <Text style={styles.detailText} numberOfLines={2}>
-                            {item.deliveryAddress.fullAddress}
-                            {item.deliveryAddress.landmark && ` (${item.deliveryAddress.landmark})`}
-                        </Text>
+                {/* Customer Information */}
+                {item.customerName && (
+                    <View style={styles.customerSection}>
+                        <View style={styles.customerInfo}>
+                            <Text style={styles.detailIcon}>👤</Text>
+                            <View style={styles.customerDetails}>
+                                <Text style={styles.customerName}>{item.customerName}</Text>
+                                {item.customerPhone && (
+                                    <Text style={styles.customerPhone}>📞 {item.customerPhone}</Text>
+                                )}
+                            </View>
+                        </View>
                     </View>
                 )}
 
+                {/* Order Items List */}
+                {item.items && item.items.length > 0 && (
+                    <View style={styles.itemsSection}>
+                        <Text style={styles.itemsSectionTitle}>📦 Order Items ({item.items.length}):</Text>
+                        {item.items.map((orderItem, index) => (
+                            <View key={index} style={styles.orderItemRow}>
+                                <Text style={styles.orderItemName}>
+                                    {orderItem.quantity}x {orderItem.itemName || orderItem.name}
+                                </Text>
+                                <Text style={styles.orderItemPrice}>
+                                    {formatCurrency(parseFloat(orderItem.totalPrice || (orderItem.unitPrice || orderItem.price) * orderItem.quantity))}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Delivery Address */}
+                {item.deliveryAddress && (
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailIcon}>📍</Text>
+                        <View style={styles.addressContainer}>
+                            <Text style={styles.addressLabel}>Delivery Address:</Text>
+                            <Text style={styles.addressText}>
+                                {item.deliveryAddress.fullAddress || 'Address not available'}
+                                {item.deliveryAddress.landmark && `\n📌 ${item.deliveryAddress.landmark}`}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
+                {/* Estimated Delivery Time */}
                 {item.estimatedDeliveryTime && (
                     <View style={styles.detailRow}>
                         <Text style={styles.detailIcon}>⏰</Text>
@@ -257,26 +288,26 @@ const OrdersScreen = () => {
                         </Text>
                     </View>
                 )}
-            </View>
 
-            <View style={styles.orderActions}>
-                <TouchableOpacity
-                    style={[styles.acceptButton, acceptingOrderId === item.id && styles.acceptButtonDisabled]}
-                    onPress={() => handleAcceptOrder(item.id)}
-                    disabled={acceptingOrderId === item.id}
-                >
-                    {acceptingOrderId === item.id ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                        <>
-                            <Text style={styles.acceptButtonIcon}>✅</Text>
-                            <Text style={styles.acceptButtonText}>Accept Order</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.orderActions}>
+                    <TouchableOpacity
+                        style={[styles.acceptButton, acceptingOrderId === item.id && styles.acceptButtonDisabled]}
+                        onPress={() => handleAcceptOrder(item.id)}
+                        disabled={acceptingOrderId === item.id}
+                    >
+                        {acceptingOrderId === item.id ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                            <>
+                                <Text style={styles.acceptButtonIcon}>✅</Text>
+                                <Text style={styles.acceptButtonText}>Accept Order</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
-        </View>
-    );
+        );
+    };
 
     const renderOrderItem = ({ item }) => (
         <TouchableOpacity
@@ -408,8 +439,6 @@ const OrdersScreen = () => {
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                         }
-                        onEndReached={loadMoreOrders}
-                        onEndReachedThreshold={0.1}
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
                                 <Text style={styles.emptyText}>📦</Text>
@@ -418,14 +447,6 @@ const OrdersScreen = () => {
                                     {selectedStatus ? 'No orders with selected status' : 'You don\'t have any assigned orders yet'}
                                 </Text>
                             </View>
-                        }
-                        ListFooterComponent={
-                            pagination?.hasNext ? (
-                                <View style={styles.loadingMore}>
-                                    <ActivityIndicator size="small" color="#007AFF" />
-                                    <Text style={styles.loadingMoreText}>Loading more orders...</Text>
-                                </View>
-                            ) : null
                         }
                     />
                 </>
@@ -530,9 +551,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     orderDetails: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         marginBottom: 8,
     },
     orderAmount: {
@@ -567,15 +585,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         textAlign: 'center',
-    },
-    loadingMore: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    loadingMoreText: {
-        marginTop: 10,
-        fontSize: 14,
-        color: '#666',
     },
     tabContainer: {
         flexDirection: 'row',
@@ -662,6 +671,74 @@ const styles = StyleSheet.create({
         color: '#333',
         flex: 1,
         lineHeight: 20,
+    },
+    customerSection: {
+        backgroundColor: '#f8f9fa',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    customerInfo: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    customerDetails: {
+        flex: 1,
+        marginLeft: 8,
+    },
+    customerName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 4,
+    },
+    customerPhone: {
+        fontSize: 14,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
+    addressContainer: {
+        flex: 1,
+    },
+    addressLabel: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    addressText: {
+        fontSize: 14,
+        color: '#333',
+        lineHeight: 20,
+    },
+    itemsSection: {
+        backgroundColor: '#f8f9fa',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    itemsSectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+    },
+    orderItemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+    },
+    orderItemName: {
+        fontSize: 14,
+        color: '#333',
+        flex: 1,
+    },
+    orderItemPrice: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#007AFF',
+        marginLeft: 10,
     },
     orderActions: {
         borderTopWidth: 1,
