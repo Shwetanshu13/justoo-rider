@@ -255,11 +255,6 @@ const HomeScreen = () => {
                         <Text style={styles.actionIcon}>📋</Text>
                         <Text style={styles.actionText}>Delivery History</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.actionCard}>
-                        <Text style={styles.actionIcon}>📞</Text>
-                        <Text style={styles.actionText}>Support</Text>
-                    </TouchableOpacity>
                 </View>
             </View>
         </ScrollView>
