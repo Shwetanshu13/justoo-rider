@@ -21,7 +21,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "newArchEnabled": false
+      "newArchEnabled": false,
+      "package": "com.shwetanshusinha.justoorider"
     },
     "web": {
       "favicon": "./assets/favicon.png"
