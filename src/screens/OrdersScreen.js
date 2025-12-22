@@ -13,11 +13,9 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { orderAPI } from '../services/orderAPI';
-import { useNotifications } from '../contexts/NotificationContext';
 
 const OrdersScreen = () => {
     const navigation = useNavigation();
-    const { refreshNotifications } = useNotifications();
     const [orders, setOrders] = useState([]);
     const [availableOrders, setAvailableOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -128,9 +126,6 @@ const OrdersScreen = () => {
                             if (response.success) {
                                 // Remove the accepted order from the available list
                                 setAvailableOrders(prev => prev.filter(order => order.id !== orderId));
-
-                                // Refresh notifications
-                                await refreshNotifications();
 
                                 Alert.alert(
                                     'Order Accepted!',

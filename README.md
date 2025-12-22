@@ -60,5 +60,4 @@ src/
 - Add delivery management screens
 - Implement real-time order updates
 - Add location tracking
-- Push notifications
 - Offline support

@@ -1,7 +1,9 @@
 // API Configuration
+
+console.log(process.env.EXPO_PUBLIC_API_BASE_URL);
 export const API_CONFIG = {
     // Update this to your actual backend URL
-    BASE_URL: ' https://63ee6cf1c2c7.ngrok-free.app/api',
+    BASE_URL: `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/rider`,
 
     // Timeout for API requests (in milliseconds)
     TIMEOUT: 10000,
