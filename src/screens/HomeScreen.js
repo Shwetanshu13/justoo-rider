@@ -184,11 +184,11 @@ const HomeScreen = () => {
                         <Text style={styles.statValue}>{riderStats?.completedDeliveries || 0}</Text>
                         <Text style={styles.statLabel}>Completed</Text>
                     </View>
-
-                    <View style={styles.statCard}>
+                    {/* Rating Card to be implemented after user rating rider function */}
+                    {/* <View style={styles.statCard}>
                         <Text style={styles.statValue}>{riderStats?.averageRating?.toFixed(1) || '5.0'}</Text>
                         <Text style={styles.statLabel}>Rating</Text>
-                    </View>
+                    </View> */}
                 </View>
 
                 {/* Delivery Statistics */}
@@ -254,14 +254,6 @@ const HomeScreen = () => {
                     >
                         <Text style={styles.actionIcon}>📋</Text>
                         <Text style={styles.actionText}>Delivery History</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('Notifications')}
-                    >
-                        <Text style={styles.actionIcon}>🔔</Text>
-                        <Text style={styles.actionText}>Notifications</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionCard}>

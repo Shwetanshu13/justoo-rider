@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
 // Import screens
@@ -11,17 +11,11 @@ import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import OrdersScreen from '../screens/OrdersScreen';
 import OrderDetailsScreen from '../screens/OrderDetailsScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
-
 // Import components
-import NotificationBadge from '../components/NotificationBadge';
 
 const RootStack = createStackNavigator();
 const MainStack = createStackNavigator();
 const TabNav = createBottomTabNavigator();
-
-const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator();
 
 const AuthStack = () => (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -61,18 +55,6 @@ const MainTabNavigator = () => (
                 tabBarLabel: 'Orders',
                 tabBarIcon: ({ color, size }) => (
                     <Text style={{ color, fontSize: size }}>📦</Text>
-                ),
-            }}
-        />
-        <TabNav.Screen
-            name="Notifications"
-            component={NotificationsScreen}
-            options={{
-                tabBarLabel: 'Notifications',
-                tabBarIcon: ({ color, size }) => (
-                    <NotificationBadge>
-                        <Text style={{ color, fontSize: size }}>🔔</Text>
-                    </NotificationBadge>
                 ),
             }}
         />
