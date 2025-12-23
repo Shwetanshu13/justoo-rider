@@ -11,6 +11,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import OrdersScreen from '../screens/OrdersScreen';
 import OrderDetailsScreen from '../screens/OrderDetailsScreen';
+import DeliveryHistoryScreen from '../screens/DeliveryHistoryScreen';
 // Import components
 
 const RootStack = createStackNavigator();
@@ -75,6 +76,7 @@ const MainStackNavigator = () => (
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
         <MainStack.Screen name="MainTabs" component={MainTabNavigator} />
         <MainStack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+        <MainStack.Screen name="DeliveryHistory" component={DeliveryHistoryScreen} />
     </MainStack.Navigator>
 );
 
