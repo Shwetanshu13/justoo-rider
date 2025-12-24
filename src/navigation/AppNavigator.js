@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 
 // Import screens
@@ -24,53 +25,57 @@ const AuthStack = () => (
     </RootStack.Navigator>
 );
 
-const MainTabNavigator = () => (
-    <TabNav.Navigator
-        screenOptions={{
-            headerShown: false,
-            tabBarStyle: {
-                backgroundColor: '#fff',
-                borderTopColor: '#e0e0e0',
-                paddingBottom: 5,
-                paddingTop: 5,
-                height: 60,
-            },
-            tabBarActiveTintColor: '#007AFF',
-            tabBarInactiveTintColor: '#666',
-        }}
-    >
-        <TabNav.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{
-                tabBarLabel: 'Dashboard',
-                tabBarIcon: ({ color, size }) => (
-                    <Text style={{ color, fontSize: size }}>🏠</Text>
-                ),
+const MainTabNavigator = () => {
+    const insets = useSafeAreaInsets();
+
+    return (
+        <TabNav.Navigator
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: {
+                    backgroundColor: '#fff',
+                    borderTopColor: '#e0e0e0',
+                    paddingBottom: Math.max(10, insets.bottom),
+                    paddingTop: 6,
+                    height: 60 + insets.bottom,
+                },
+                tabBarActiveTintColor: '#007AFF',
+                tabBarInactiveTintColor: '#666',
             }}
-        />
-        <TabNav.Screen
-            name="Orders"
-            component={OrdersScreen}
-            options={{
-                tabBarLabel: 'Orders',
-                tabBarIcon: ({ color, size }) => (
-                    <Text style={{ color, fontSize: size }}>📦</Text>
-                ),
-            }}
-        />
-        <TabNav.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{
-                tabBarLabel: 'Settings',
-                tabBarIcon: ({ color, size }) => (
-                    <Text style={{ color, fontSize: size }}>⚙️</Text>
-                ),
-            }}
-        />
-    </TabNav.Navigator>
-);
+        >
+            <TabNav.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{
+                    tabBarLabel: 'Dashboard',
+                    tabBarIcon: ({ color, size }) => (
+                        <Text style={{ color, fontSize: size }}>🏠</Text>
+                    ),
+                }}
+            />
+            <TabNav.Screen
+                name="Orders"
+                component={OrdersScreen}
+                options={{
+                    tabBarLabel: 'Orders',
+                    tabBarIcon: ({ color, size }) => (
+                        <Text style={{ color, fontSize: size }}>📦</Text>
+                    ),
+                }}
+            />
+            <TabNav.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{
+                    tabBarLabel: 'Settings',
+                    tabBarIcon: ({ color, size }) => (
+                        <Text style={{ color, fontSize: size }}>⚙️</Text>
+                    ),
+                }}
+            />
+        </TabNav.Navigator>
+    );
+};
 
 const MainStackNavigator = () => (
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
